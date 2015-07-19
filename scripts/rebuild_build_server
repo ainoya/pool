@@ -18,7 +18,7 @@ cd /app/docker/pool
 docker build -t pool-server .
 
 if [ $start == "true" ]; then
-     docker run -d -v /var/run/docker.sock:/var/run/docker.sock \
+     docker run -it -v /var/run/docker.sock:/var/run/docker.sock \
           --name pool -p 80:80 -p 8080:8080 pool-server
 else
      echo -e "# Please run manually: 

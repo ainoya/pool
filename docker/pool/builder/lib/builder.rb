@@ -16,6 +16,7 @@ require 'builder/constants'
 require 'builder/config'
 require 'builder/bot'
 require 'builder/version'
+require 'builder/compose'
 
 module Builder
   class BuildLockedError < StandardError; end

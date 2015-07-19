@@ -1,4 +1,5 @@
 require 'docker'
+require 'pty'
 require 'builder/config'
 require 'erb'
 require 'builder/compose/compose_handler'
@@ -15,8 +16,21 @@ module Builder
       end
       
       def web
-        @container ||= find_container_by_commit_id(@id)
+        @container = Compose.find_container_by_commit_id(@id)
         @container
+      end
+
+      def wait? &block
+        count = 1
+
+        while @container == nil && count <= 100
+          block.call
+          count = count + 1
+          web
+          sleep 3
+        end
+
+        return @container
       end
     end
 
@@ -35,17 +49,22 @@ module Builder
     #   Git commit id
     #
     def find_container_by_commit_id(commit_id, opts={})
-      logger = opts[:logger] || logger || Logger.new(STDOUT)
-
-      logger.info("Getting container id for commit id<#{commit_id}>")
-      
-      container = Docker::Container.all.select{|c| 
+      logger.info("matching: #{commit_id}, container: #{::Docker::Container.all.size}")
+      container = ::Docker::Container.all.select{|c| 
         matched_env = c.json["Config"]["Env"].map{|a| a.split("=")}.select{|a| a[0] == "GIT_COMMIT"}.first
-        return false unless matched_env
-        return true  if matched_env.last == commit_id
+
+        if !matched_env 
+          false
+        elsif matched_env.last == commit_id
+          true
+        else
+          false
+        end
       }.first
 
       return nil unless container
+
+      logger.info("matched: #{container}")
 
       return format_container_data(container.json)
     end
@@ -61,19 +80,30 @@ module Builder
     def up(id, dir, opts = {})
       t = Thread.new do
         Dir.chdir(dir) do
+          logger.info("Start docker-compose... #{dir}")
+          assign_commit_id(dir, id)
+
           IO.popen("docker-compose build") do |data|
             while line = data.gets
               logger.info line
             end
           end
-          
-          assign_commit_id(dir, id)
 
-          IO.popen("docker-compose up") do |data|
-            while line = data.gets
-              logger.info line
+          PTY.spawn("docker-compose up") do |stdout, stdin, pid|
+            stdin.close_write
+            stdout.sync = true
+
+            begin
+              stdout.each do |line|
+              next if line.nil? || line.empty?
+              puts line
+              end
+            rescue Errno::EIO
+            ensure
+              ::Process.wait pid
             end
           end
+
         end
       end
       
@@ -83,10 +113,13 @@ module Builder
     def assign_commit_id(dir, id)
       @git_commit_id = id
       Dir.chdir(dir) do
+        logger.info("Write docker-compose.yml file dir: #{dir}")
         File.write('./docker-compose.yml',
-                   ERB.new(File.read('./docker-compose.yml.erb').result(binding))
+                   ERB.new(File.read('./docker-compose.yml.erb')).result(binding)
                   )
       end
+    rescue => e
+      logger.info("error: #{e}")
     end
 
     def build(tag, dir, opts = {})

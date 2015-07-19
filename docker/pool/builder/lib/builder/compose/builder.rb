@@ -1,27 +1,10 @@
-require 'fileutils'
-require 'net/http'
-require 'logger'
-require 'timeout'
-
-require 'git'
-require 'pty'
-
-require 'builder/build_handler'
-require 'builder/builder_log_device'
-require 'builder/git'
-require 'builder/git_handler'
-require 'builder/docker'
-require 'builder/docker_handler'
-require 'builder/constants'
-require 'builder/config'
-require 'builder/bot'
-require 'builder/version'
-require 'compose'
+require 'builder'
 
 module Builder::Compose
   class BuildLockedError < StandardError; end
 
   class Builder
+    include ::Builder
     include ::Builder::Git
 
     # Initialize method
@@ -61,7 +44,8 @@ module Builder::Compose
       @log_device_pool = BuilderLogDevicePool.instance
       logger = Logger.new(BuilderLogDevice.new(res, "#{log_file}"))
       # Initialize Git repository and set @rgit instance
-      Docker.logger = logger
+      Docker.logger  = logger
+      Compose.logger = logger
 
       @rgit = init_repo(@repository[:url],
                         @repository[:path],
@@ -105,8 +89,8 @@ module Builder::Compose
       begin
         lock = File.open(lockfile, 'w')
         if lock.flock(File::LOCK_EX | File::LOCK_NB )
-          cluster = compose_up(@git_commit_id)
-          confirm_running(cluster.web)
+          @cluster = compose_up
+          confirm_running(@cluster)
         else
           @logger.info("Locked! Other environment is under building process")
           @logger.info("Please wait for finishing another building process...")
@@ -136,12 +120,17 @@ module Builder::Compose
     # the container is not ready, wait and retry to send request
     #
     # TODO: need to set protocol, port and path by the user
-    def confirm_running(container)
-      ip = container[:ip]
+    def confirm_running(cluster)
+      container = cluster.wait? do
+        @logger.info("waiting cluster..")
+      end
+
+      ip   = container[:ip]
       port = container[:port]
 
       tried_count = 1
       begin
+
         @logger.info "Checking application is ready... trying count:#{tried_count}"
         req = Net::HTTP.new(ip, port)
         res = req.get('/')

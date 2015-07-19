@@ -21,7 +21,7 @@ module Builder::Compose
         commit_id = $1
         begin
           res.status = 200
-          container = Docker.find_container_by_commit_id(commit_id)
+          container = ::Builder::Compose.find_container_by_commit_id(commit_id)
           if container
             addr = "#{container[:ip]}:#{container[:port]}"
             res.content = JSON.generate({:status => 'success',
