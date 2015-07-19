@@ -41,6 +41,9 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     # in CoreOS, so tell Vagrant that so it can be smarter.
     v.check_guest_additions = false
     v.functional_vboxsf     = false
+
+    v.customize ['modifyvm', :id, '--natdnshostresolver1', 'on']
+    v.customize ["modifyvm", :id, "--nictype1", "virtio"]
   end
 
   config.ssh.insert_key = false
