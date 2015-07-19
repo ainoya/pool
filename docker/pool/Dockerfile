@@ -28,8 +28,6 @@ ADD provisioning/cron/limit_containers /etc/cron.d/limit_containers
 ADD builder /tmp/builder
 WORKDIR /tmp/builder
 RUN /opt/ruby-2.1.2/bin/bundle install --path=vendor/bundle
-# Test builder
-RUN /opt/ruby-2.1.2/bin/bundle exec rake spec
 RUN /usr/local/bin/gem build builder.gemspec
 RUN /usr/local/bin/gem install builder-0.0.1.gem
 
@@ -79,6 +77,10 @@ ENV MAX_CONTAINERS 10
 ENV GIT_COMMIT_ID_CACHE_EXPIRE 10
 ENV POOL_BASE_DOMAIN pool.dev
 ENV GITHUB_BOT false
+
+# add docker-compose
+RUN curl -L https://github.com/docker/compose/releases/download/1.3.3/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
+RUN chmod +x /usr/local/bin/docker-compose
 
 EXPOSE 80 8080
 
