@@ -35,6 +35,7 @@ RUN /usr/local/bin/gem install builder-0.0.1.gem
 
 # Add mod_mruby handler to manage request
 
+COPY ./handlers /app/handlers
 COPY ./build-screen/dist /app/handlers/resources/build-screen
 
 # Add util scripts for handling containers
